@@ -56,7 +56,7 @@ function settleInside(db:Db,m:InternalMatch){
   const w=getProfile(db,m.whiteId), b=getProfile(db,m.blackId); if(!w||!b) return;
   w.games++; b.games++; const draw=m.result==='1/2-1/2';
   if(draw){ w.draws++;b.draws++; } else if(m.result==='1-0'){w.wins++;b.losses++;w.rating+=10;b.rating=Math.max(100,b.rating-10);} else {b.wins++;w.losses++;b.rating+=10;w.rating=Math.max(100,w.rating-10);}
-  w.xp+=draw?5:20; b.xp+=draw?5:20; saveProfile(db,w); saveProfile(db,b); m.ratedSettled=1; saveMatch(db,m);
+  w.xp+=draw?10:m.result==='1-0'?20:0; b.xp+=draw?10:m.result==='0-1'?20:0; saveProfile(db,w); saveProfile(db,b); m.ratedSettled=1; saveMatch(db,m);
 }
 function publicMatch(db:Db,m:InternalMatch){
   const out:any={id:m.id,white:player(db,m.whiteId),black:m.blackId?player(db,m.blackId):null,fen:m.fen,pgn:m.pgn,moves:m.moves,status:m.status,result:m.result,reason:m.reason,whiteMs:m.whiteMs,blackMs:m.blackMs,increment:m.increment,lastMoveAt:m.lastMoveAt,createdAt:m.createdAt,drawOffer:m.drawOffer?player(db,m.drawOffer).id:null,reactions:m.reactions,rated:m.rated};

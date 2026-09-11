@@ -11,3 +11,18 @@ async function session(base:string){ const r=await fetch(base+'/api/session'); r
 test('sessions are browser scoped and profiles persist',async()=>{const x=await running();try{const a=await session(x.base);assert.equal(a.body.profile.name,'Guest');const r=await fetch(x.base+'/api/session',{headers:{cookie:a.cookie}});assert.equal((await r.json() as any).profile.id,a.body.profile.id);}finally{x.close();}});
 test('match ownership and turn validation are enforced',async()=>{const x=await running();try{const a=await session(x.base), b=await session(x.base);let r=await fetch(x.base+'/api/matches',{method:'POST',headers:{cookie:a.cookie,'content-type':'application/json'},body:JSON.stringify({minutes:3,increment:0,rated:true})});const id=(await r.json() as any).match.id;assert.equal((await fetch(`${x.base}/api/matches/${id}/join`,{method:'POST',headers:{cookie:b.cookie}})).status,200);assert.equal((await fetch(`${x.base}/api/matches/${id}/move`,{method:'POST',headers:{cookie:b.cookie,'content-type':'application/json'},body:JSON.stringify({from:'e2',to:'e4'})})).status,409);assert.equal((await fetch(`${x.base}/api/matches/${id}/move`,{method:'POST',headers:{cookie:a.cookie,'content-type':'application/json'},body:JSON.stringify({from:'e2',to:'e4'})})).status,200);assert.equal((await fetch(`${x.base}/api/matches/${id}/resign`,{method:'POST',headers:{cookie:a.cookie}})).status,200);}finally{x.close();}});
 test('puzzle solutions are checked and awarded once',async()=>{const x=await running();try{const a=await session(x.base);const good={method:'POST',headers:{cookie:a.cookie,'content-type':'application/json'},body:JSON.stringify({moves:['Qg7#']})};assert.deepEqual(await (await fetch(x.base+'/api/puzzles/daily-1/solve',good)).json(),{correct:true});assert.deepEqual(await (await fetch(x.base+'/api/puzzles/daily-1/solve',good)).json(),{correct:true});const p=await (await fetch(x.base+'/api/session',{headers:{cookie:a.cookie}})).json() as any;assert.equal(p.profile.puzzlesSolved,1);}finally{x.close();}});
+test('friend rewards are win 20 draw 10 loss zero and settle once',async()=>{
+ const x=await running();try{
+ const a=await session(x.base),b=await session(x.base);
+ const call=async(path:string,cookie:string,body?:object)=>{const r=await fetch(x.base+'/api'+path,{method:body?'POST':'GET',headers:{cookie,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});assert.equal(r.ok,true);return await r.json() as any;};
+ for(const draw of [false,true]){
+ const {match}=await call('/matches',a.cookie,{minutes:5,increment:0,rated:true});const path='/matches/'+match.id;
+ await call(path+'/join',b.cookie,{});
+ for(const [cookie,from,to] of [[a.cookie,'e2','e4'],[b.cookie,'e7','e5'],[a.cookie,'g1','f3'],[b.cookie,'b8','c6']])await call(path+'/move',cookie,{from,to});
+ if(draw){await call(path+'/draw',a.cookie,{action:'offer'});await call(path+'/draw',b.cookie,{action:'accept'});}else await call(path+'/resign',b.cookie,{});
+ await call(path,a.cookie);await call(path,a.cookie);
+ assert.equal((await call('/session',a.cookie)).profile.xp,draw?30:20);
+ assert.equal((await call('/session',b.cookie)).profile.xp,draw?10:0);
+ }
+ }finally{x.close();}
+});
