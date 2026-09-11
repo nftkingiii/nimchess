@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createServer } from 'node:http';
+import { createApp, createDb } from './app.js';
+
+async function running(){ const dir=mkdtempSync(join(tmpdir(),'nimchess-')); const db=createDb(dir); const s=createServer(createApp({db})); await new Promise<void>(r=>s.listen(0,r)); const address=s.address() as any; const base=`http://127.0.0.1:${address.port}`; return {base,close:()=>{s.close();db.close();rmSync(dir,{recursive:true,force:true});}}; }
+async function session(base:string){ const r=await fetch(base+'/api/session'); return {cookie:(r.headers.get('set-cookie')||'').split(';')[0], body:await r.json() as any}; }
+test('sessions are browser scoped and profiles persist',async()=>{const x=await running();try{const a=await session(x.base);assert.equal(a.body.profile.name,'Guest');const r=await fetch(x.base+'/api/session',{headers:{cookie:a.cookie}});assert.equal((await r.json() as any).profile.id,a.body.profile.id);}finally{x.close();}});
+test('match ownership and turn validation are enforced',async()=>{const x=await running();try{const a=await session(x.base), b=await session(x.base);let r=await fetch(x.base+'/api/matches',{method:'POST',headers:{cookie:a.cookie,'content-type':'application/json'},body:JSON.stringify({minutes:3,increment:0,rated:true})});const id=(await r.json() as any).match.id;assert.equal((await fetch(`${x.base}/api/matches/${id}/join`,{method:'POST',headers:{cookie:b.cookie}})).status,200);assert.equal((await fetch(`${x.base}/api/matches/${id}/move`,{method:'POST',headers:{cookie:b.cookie,'content-type':'application/json'},body:JSON.stringify({from:'e2',to:'e4'})})).status,409);assert.equal((await fetch(`${x.base}/api/matches/${id}/move`,{method:'POST',headers:{cookie:a.cookie,'content-type':'application/json'},body:JSON.stringify({from:'e2',to:'e4'})})).status,200);assert.equal((await fetch(`${x.base}/api/matches/${id}/resign`,{method:'POST',headers:{cookie:a.cookie}})).status,200);}finally{x.close();}});
+test('puzzle solutions are checked and awarded once',async()=>{const x=await running();try{const a=await session(x.base);const good={method:'POST',headers:{cookie:a.cookie,'content-type':'application/json'},body:JSON.stringify({moves:['Qg7#']})};assert.deepEqual(await (await fetch(x.base+'/api/puzzles/daily-1/solve',good)).json(),{correct:true});assert.deepEqual(await (await fetch(x.base+'/api/puzzles/daily-1/solve',good)).json(),{correct:true});const p=await (await fetch(x.base+'/api/session',{headers:{cookie:a.cookie}})).json() as any;assert.equal(p.profile.puzzlesSolved,1);}finally{x.close();}});
