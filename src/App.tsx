@@ -4,6 +4,7 @@ import {Chess} from 'chess.js';
 import type {Match,Profile,Puzzle} from '../shared/types';
 import {api,download,share} from './api';
 import {Avatar,avatars,facts,Modal,rankFor,ranks} from './components';
+import LaunchScreen from './LaunchScreen';
 import ChessBoard from './game/ChessBoard';
 import MatchView from './game/MatchView';
 type Tab='play'|'puzzles'|'club'|'profile';
@@ -12,9 +13,12 @@ export default function App(){
  const [tab,setTab]=useState<Tab>('play'),[profile,setProfile]=useState<Profile|null>(null),[error,setError]=useState(''),[toast,setToast]=useState(''),[game,setGame]=useState<Game|null>(()=>{try{const g=JSON.parse(sessionStorage.getItem('nimchess.active')||'null');return g&&['bot','local'].includes(g.mode)&&[3,5,10].includes(g.minutes)?g:null}catch{return null}}),[modal,setModal]=useState<'setup'|'wallet'|'settings'|'help'|null>(null),[setup,setSetup]=useState<'bot'|'local'|'online'>('bot'),[difficulty,setDifficulty]=useState<'easy'|'medium'|'hard'>('medium'),[minutes,setMinutes]=useState(5),[increment,setIncrement]=useState(0),[busy,setBusy]=useState(false),[fact,setFact]=useState(0),[history,setHistory]=useState<Match[]>([]),[leaders,setLeaders]=useState<Profile[]>([]),[puzzles,setPuzzles]=useState<Puzzle[]>([]),[activePuzzle,setActivePuzzle]=useState<Puzzle|null>(null),[replay,setReplay]=useState<Match|null>(null),[tipTarget,setTipTarget]=useState<{name:string;address:string}|null>(null);
  useEffect(()=>{try{if(game&&game.mode!=='online')sessionStorage.setItem('nimchess.active',JSON.stringify(game));else sessionStorage.removeItem('nimchess.active')}catch{}},[game]);
  useEffect(()=>{const onboard=()=>setModal('settings');window.addEventListener('nimchess:onboard',onboard);return()=>window.removeEventListener('nimchess:onboard',onboard)},[]);
+ const [startup,setStartup]=useState(true);
+ const [startupSlow,setStartupSlow]=useState(false);
+ useEffect(()=>{if(!startup)return;const timer=setTimeout(()=>setStartupSlow(true),15000);return()=>clearTimeout(timer)},[startup]);
  const notify=useCallback((text:string)=>setToast(text),[]);
  const refresh=useCallback(async()=>{const result=await api<{profile:Profile}>('/session');setProfile(result.profile);return result.profile},[]);
- useEffect(()=>{refresh().then(async()=>{const id=new URLSearchParams(location.search).get('match');if(id){const {match}=await api<{match:Match}>('/matches/'+encodeURIComponent(id));setGame({mode:'online',match,minutes:5,increment:match.increment/1000})}}).catch(e=>setError(e.message));api<{puzzles:Puzzle[]}>('/puzzles').then(v=>setPuzzles(v.puzzles)).catch(()=>{});},[refresh]);
+ useEffect(()=>{refresh().then(async()=>{const id=new URLSearchParams(location.search).get('match');if(id){const {match}=await api<{match:Match}>('/matches/'+encodeURIComponent(id));setGame({mode:'online',match,minutes:5,increment:match.increment/1000})}}).catch(e=>setError(e.message)).finally(()=>setStartup(false));api<{puzzles:Puzzle[]}>('/puzzles').then(v=>setPuzzles(v.puzzles)).catch(()=>{});},[refresh]);
  useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),5000);return()=>clearTimeout(timer)},[toast]);
  useEffect(()=>{if(tab==='profile')api<{matches:Match[]}>('/history').then(d=>setHistory(d.matches)).catch(e=>notify(e.message));if(tab==='club')api<{profiles:Profile[]}>('/leaderboard').then(d=>setLeaders(d.profiles)).catch(e=>notify(e.message));},[tab,notify]);
  useEffect(()=>{document.documentElement.dataset.theme=profile?.theme||'sage'},[profile?.theme]);
@@ -25,6 +29,7 @@ export default function App(){
  async function saveProfile(data:Partial<Profile>){const {profile:p}=await api<{profile:Profile}>('/profile','PATCH',data);setProfile(p);notify('Profile updated')}
  const rank=rankFor(profile?.xp||0),nextRank=ranks.find(r=>r.xp>(profile?.xp||0));
  const daily=puzzles.length?puzzles[Math.floor(Date.now()/86400000)%puzzles.length]:null;
+ if(startup||!profile)return <LaunchScreen failed={startupSlow||(!startup&&!profile)}/>;
  return <div className="app-shell"><header className="app-header"><button className="brand" onClick={()=>{if(game){notify('Use Back to leave your match');return}setTab('play')}} aria-label="NimChess home"><img src="/favicon.svg" alt=""/><span>NimChess<span className="brand-dot">.</span></span></button><div className="header-actions"><button className={'wallet-pill '+(profile?.walletAddress?'connected':'')} onClick={()=>setModal('wallet')}><Wallet size={17}/><span>{profile?.walletAddress?'Connected':'Connect'}</span></button><button className="avatar-button" onClick={()=>{if(!game)setTab('profile')}} aria-label="Your profile"><Avatar name={profile?.avatar}/></button></div></header>
  {error&&<div role="alert" className="error-banner">{error}<button onClick={()=>{setError('');refresh().catch(e=>setError(e.message))}}>Retry</button></div>}
  <main className={game?'main-content in-game':'main-content'}>
