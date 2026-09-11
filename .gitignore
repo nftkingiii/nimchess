@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+data/
+PROJECT_STATE.md
+TASK_LEDGER.md
+HACK_EVENT_GATE.json
+artifacts/
+tmp-test/
+test-results/
+playwright-report/
