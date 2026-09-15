@@ -8,7 +8,7 @@ A mobile chess club built for Nimiq Pay. Play a bot, challenge a friend, solve a
 - Private friend links, server-validated moves, 3/5/10-minute clocks, increments, draw offers, resignation, rematches and reconnect polling.
 - Eight original puzzle positions, daily rotation, hints, explanations, XP and NimRanks.
 - Persistent browser profiles, selectable avatars and board palettes, club standings, game history and PGN replay/export.
-- Official Nimiq Pay SDK connection, signed challenge verification, disconnect and optional direct player tips.
+- Official Nimiq Pay SDK connection plus standalone Nimiq Hub/Wallet fallback, signed challenge verification, disconnect and optional direct player tips.
 - Original generated knight artwork, custom SVG pieces, mobile layout and keyboard focus states.
 
 ## Run
@@ -35,7 +35,7 @@ Use one Node process and one replica. Set `NODE_ENV=production`, `PUBLIC_ORIGIN`
 
 ## Wallet behavior
 
-Open the HTTPS application inside Nimiq Pay. A signed, short-lived challenge proves control of the linked tipping address. Guest progress is browser scoped; wallet linking currently does not synchronize profiles across devices. Disconnect removes the application association; there is no documented SDK operation to disconnect the host wallet itself.
+Open the HTTPS application inside Nimiq Pay, or use the wallet dialog's standalone Nimiq Wallet option in a normal browser. Nimiq Pay uses the injected Mini App provider; standalone browsers use Nimiq Hub/Keyguard for signed-message authentication and approved NIM checkout. A signed, short-lived challenge proves control of the linked tipping address. Guest progress is browser scoped; wallet linking currently does not synchronize profiles across devices. Disconnect removes the application association; there is no documented SDK operation to disconnect the host wallet itself.
 
 The documented Nimiq provider does not expose a network query. NimChess therefore does not infer mainnet or testnet from an address. Check the network, recipient, amount and fee in the native wallet before approving a tip. A returned transaction hash is shown as submitted, not confirmed. Native wallet interaction must be tested on a real phone; cryptographic unit tests do not establish device compatibility.
 
